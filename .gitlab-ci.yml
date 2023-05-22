@@ -1,0 +1,40 @@
+stages:
+- lint
+- build
+- deploy
+
+variables:
+  NAMESPACE: exampleuser
+  APPNAME: dummygoapp
+
+build_image:
+  stage: build
+  image: docker:20.10.16
+  services:
+  - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+  # ADD YOUR DOCKER USERNAME AND DOCKER PASS INTO GITLAB VARIABLES
+  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  - docker login -u $DOCKER_USER -p $DOCKER_PASS
+  - docker build -t $DOCKER_USER/$APPNAME .
+  - docker push $DOCKER_USER/$APPNAME:latest
+
+deploy:
+  stage: deploy
+  image: xgolis/deployimage:latest
+  script:
+  - chmod 400 /root/.ssh/id_rsa
+  - ssh-keyscan 35.240.30.14 >> /root/.ssh/known_hosts
+  - mkdir ~/.kube
+  - scp -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa xgolis@35.240.30.14:/home/xgolis/.kube/config ~/.kube
+  - kubectl config set-cluster kubernetes --server=https://35.240.30.14:6443
+  - kubectl config set-cluster kubernetes --insecure-skip-tls-verify
+  - kubectl get pods --namespace=${{env.NAMESPACE}}
+
+  - helm upgrade ${{env.APPNAME}} ./helm \
+      --install -n ${{env.NAMESPACE}} --version ${{ github.sha }} \
+      --set "image.fullImage=${{ secrets.DOCKERHUB_USERNAME }}/${{env.APPNAME}}:latest" \
+      --set "app.namespace=${{env.NAMESPACE}}" --force
+  # --set-file "app.exampleConfig="/path/to/config""
