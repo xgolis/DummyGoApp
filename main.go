@@ -13,7 +13,7 @@ func main() {
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "Hello")
+		fmt.Fprint(w, "Hello\n")
 	})
 
 	log.Println("Server listening on port 8080")
